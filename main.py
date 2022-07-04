@@ -1,15 +1,24 @@
-import os, sys, csv, ssl, certifi
+import os, sys, ssl, certifi
 from collections import defaultdict
 from requests import get
 from bs4 import BeautifulSoup
-import pandas as pd
+import sqlite3
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 import geopy.geocoders
 
 class Main():
-    def __init__(self, csvFile):
-        self.csvFile = csvFile
+    def __init__(self, dbFile):
+        self.conn = sqlite3.connect(dbFile)
+        self.cursor = self.conn.cursor()
+        self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS college_locations (
+                    college_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    college_name TEXT,
+                    latitude TEXT,
+                    longitude TEXT
+                )
+        """)
 
     def _getRosterData(self):
         # scrapes the roster webpage and returns the table rows that have each player's information
@@ -45,41 +54,33 @@ class Main():
             return location2
         return geolocator.geocode(f"University of {uni}")
 
-    def _map_location_to_player(self):
-        # Creates dictionary that maps [latitude, longitude, collegeName] to players that went to that college
-        # Example: {[37.8, -122.2, "Berkeley"]: [players that went to Berkeley]}
+    def _update_locations_db(self):
+        # checks if there's any colleges not in the db and adds them if need be
         college_to_player = self._map_college_to_players()
-        lat_long_dict = {}
+        colleges_not_in_db = []
         for college, players in college_to_player.items():
-            try:
-                location = self._get_coords(college)
-                lat_long_dict[(location.latitude, location.longitude, college)] = players
-            except Exception as e:
-                print(e)
-                continue
-        return lat_long_dict
+            query = self.cursor.execute("SELECT * FROM college_locations WHERE college_name = ?", (college,)).fetchall()
+            if bool(query) == False: # college NOT in db
+                try:
+                    location = self._get_coords(college)
+                    colleges_not_in_db.append((college, location.latitude, location.longitude))
+                except Exception as e:
+                    print(e)
+                    #continue
 
-
-    def _write_data_to_csvFile(self):
-        # writes data to csv file
-        # Format: [Players that went to this college], Latitude of college, Longitude of college, college name
-        lat_long_dict = self._map_location_to_player()
-        with open(self.csvFile, 'w') as player_file:
-            player_writer = csv.writer(player_file, delimiter=',')
-            player_writer.writerow(['Players', "Latitude", "Longitude", "Location"])
-            for location, players in lat_long_dict.items():
-                latitude, longitude, college = location
-                player_writer.writerow(
-                    [players, latitude, longitude, college])
+        # save new colleges to db
+        self.cursor.executemany("INSERT INTO college_locations(college_name, latitude, longitude) VALUES (?,?,?)", colleges_not_in_db)
+        self.conn.commit()
 
     def _plot_data(self):
-        # Reads the csv file and plots data on a US map
-        df = pd.read_csv(self.csvFile)
-        print(df)
+        self._update_locations_db()
+        # this makes it so that select doesn't return tuple and instead the individual values
+        self.cursor.row_factory = lambda cursor, row: row[0]
+
         fig = go.Figure(data=go.Scattergeo(
-            lon=df['Longitude'],
-            lat=df['Latitude'],
-            text=df["Players"] + ": " + df["Location"],
+            lon=self.cursor.execute("SELECT longitude FROM college_locations").fetchall(),
+            lat=self.cursor.execute("SELECT latitude FROM college_locations").fetchall(),
+            text=self.cursor.execute("SELECT college_name FROM college_locations").fetchall(),
             mode='markers',
             marker_color="rgb(210, 0, 0)"
         ))
@@ -95,17 +96,10 @@ class Main():
         fig.show()
 
     def run(self):
-        if os.path.exists(self.csvFile):
-            print(f"'{self.csvFile}' already exists")
-            userInput = input("Do you want to use the information from there? (keep in mind it might be outdated) [Y/N]: ")
-            if userInput.lower() == "y":
-                self._plot_data()
-                return
-        print("Fetching latest player information...")
-        self._write_data_to_csvFile()
         self._plot_data()
+        self.conn.close()
 
 
 if __name__ == '__main__':
-    fourtyNinersMain = Main("player_file.csv")
+    fourtyNinersMain = Main("locations.db")
     fourtyNinersMain.run()
