@@ -11,13 +11,19 @@ class Main():
     def __init__(self, dbFile):
         self.conn = sqlite3.connect(dbFile)
         self.cursor = self.conn.cursor()
-        self.cursor.execute("""
+        self.cursor.executescript("""
                 CREATE TABLE IF NOT EXISTS college_locations (
                     college_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     college_name TEXT,
                     latitude TEXT,
                     longitude TEXT
-                )
+                );
+                CREATE TABLE IF NOT EXISTS players (
+                    player_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    player_name TEXT,
+                    college_id INTEGER,
+                    FOREIGN KEY (college_id) REFERENCES college_locations(college_id)
+                );
         """)
 
     def _getRosterData(self):
