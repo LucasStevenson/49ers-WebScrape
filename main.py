@@ -72,7 +72,6 @@ class Main:
         # parses data in college_to_players dictionary and plots information on an interactive map of the US
         lat, lon, text = [],[],[]
         for k,v in self.college_to_players.items():
-            print(f"{k}: {v}")
             lat.append(k[1])
             lon.append(k[2])
             text.append(f"{k[0]}: {v}")
@@ -85,7 +84,7 @@ class Main:
             marker_color="rgb(210, 0, 0)"
         ))
         fig.update_layout(
-            title='SF 49ers Colleges<br>(Hover for [player name: college])',
+            title='SF 49ers Colleges<br>(Hover over dots to see <i>college: [players]</i>)',
             geo=dict(
                 scope='usa',
                 showland=True,
