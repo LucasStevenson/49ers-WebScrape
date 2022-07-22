@@ -2,5 +2,4 @@
 
 ## Demo
 
-![Finished Result](https://i.imgur.com/xyFDI3t.mp4)
-![Finished Result](https://i.imgur.com/LpHhPsA.gif)
+https://user-images.githubusercontent.com/45473315/180381268-7571623a-590a-492b-9a8d-8d7e9001b197.mp4
